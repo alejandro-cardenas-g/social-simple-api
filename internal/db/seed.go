@@ -148,6 +148,9 @@ func generateUsers(num int) []*store.User {
 		users[i] = &store.User{
 			Username: username,
 			Email:    username + "@mail.com",
+			Role: store.Role{
+				Name: "user",
+			},
 		}
 	}
 	return users

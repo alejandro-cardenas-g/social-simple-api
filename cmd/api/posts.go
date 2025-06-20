@@ -46,11 +46,13 @@ func (api *application) createPostHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	user := getUserFromCtx(r)
+
 	post := &store.Post{
 		Title:   payload.Title,
 		Content: payload.Content,
 		Tags:    payload.Tags,
-		UserId:  1,
+		UserId:  user.ID,
 	}
 
 	ctx := r.Context()

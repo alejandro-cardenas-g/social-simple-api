@@ -4,8 +4,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/alejandro-cardenas-g/social/internal/auth"
 	"github.com/alejandro-cardenas-g/social/internal/db"
 	"github.com/alejandro-cardenas-g/social/internal/env"
+	"github.com/alejandro-cardenas-g/social/internal/mailer"
 	"github.com/alejandro-cardenas-g/social/internal/store"
 	"go.uber.org/zap"
 )
@@ -30,8 +32,9 @@ const version = "0.0.1"
 // @description
 func main() {
 	cfg := config{
-		addr:    env.GetString("ADDR", ":8080"),
-		apiHost: env.GetString("HOST_API", "localhost:8080"),
+		addr:        env.GetString("ADDR", ":8080"),
+		apiHost:     env.GetString("HOST_API", "localhost:8080"),
+		frontendURL: env.GetString("FRONTEND_URL", "http://localhost:5173"),
 		db: dbConfig{
 			addr:         env.GetString("DB_ADDR", "postgres://admin:password@localhost/socialnetwork?sslmode=disable"),
 			maxOpenConns: env.GetInt("DB_MAX_OPEN_CONNS", 30),
@@ -40,7 +43,22 @@ func main() {
 		},
 		env: env.GetString("ENV", "development"),
 		mail: mailConfig{
-			exp: time.Hour * 24 * 3,
+			exp:       time.Hour * 24 * 3,
+			fromEmail: env.GetString("FROM_EMAIL", ""),
+			sendGrid: SendGridConfig{
+				apikey: env.GetString("SENDGRID_API_KEY", ""),
+			},
+		},
+		auth: authConfig{
+			basic: basicConfig{
+				user:     env.GetString("AUTH_BASIC_USER", ""),
+				password: env.GetString("AUTH_BASIC_PASSWORD", ""),
+			},
+			token: tokenConfig{
+				secret: env.GetString("TOKEN_SECRET", "exampleToken"),
+				exp:    time.Hour * 24 * 3,
+				iss:    "socalPostsApp",
+			},
 		},
 	}
 
@@ -58,10 +76,16 @@ func main() {
 
 	store := store.NewStorage(db)
 
+	mailer := mailer.NewSendGrid(cfg.mail.sendGrid.apikey, cfg.mail.fromEmail)
+
+	jwtAuthenticator := auth.NewJWtAuthenticator(cfg.auth.token.secret, cfg.auth.token.iss, cfg.auth.token.iss)
+
 	app := &application{
-		config: cfg,
-		store:  store,
-		logger: logger,
+		config:        cfg,
+		store:         store,
+		logger:        logger,
+		mailer:        mailer,
+		authenticator: jwtAuthenticator,
 	}
 
 	mux := app.mount()

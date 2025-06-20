@@ -37,10 +37,6 @@ func (api *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type FollowUserPayload struct {
-	UserID int64 `json:"user_id"`
-}
-
 // FollowUser godoc
 //
 //	@summary		Follows an user
@@ -57,19 +53,19 @@ type FollowUserPayload struct {
 func (api *application) followUserHandler(w http.ResponseWriter, r *http.Request) {
 	followerUser := getUserFromCtx(r)
 
-	payload := &FollowUserPayload{}
-	// TODO: remove this when auth is created
-	if err := readJSON(w, r, payload); err != nil {
+	followedId, err := strconv.ParseInt(chi.URLParam(r, "userID"), 10, 64)
+
+	if err != nil {
 		api.badRequestError(w, r, err)
 		return
 	}
 
-	if followerUser.ID == payload.UserID {
+	if followerUser.ID == followedId {
 		api.conflictError(w, r, nil)
 		return
 	}
 
-	if err := api.store.Followers.Follow(r.Context(), followerUser.ID, payload.UserID); err != nil {
+	if err := api.store.Followers.Follow(r.Context(), followerUser.ID, followedId); err != nil {
 
 		switch err {
 		case store.ErrConflict:
@@ -101,19 +97,19 @@ func (api *application) followUserHandler(w http.ResponseWriter, r *http.Request
 func (api *application) unfollowUserHandler(w http.ResponseWriter, r *http.Request) {
 	followerUser := getUserFromCtx(r)
 
-	var payload FollowUserPayload
-	// TODO: remove this when auth is created
-	if err := readJSON(w, r, &payload); err != nil {
+	unfollowedId, err := strconv.ParseInt(chi.URLParam(r, "userID"), 10, 64)
+
+	if err != nil {
 		api.badRequestError(w, r, err)
 		return
 	}
 
-	if followerUser.ID == payload.UserID {
+	if followerUser.ID == unfollowedId {
 		api.conflictError(w, r, nil)
 		return
 	}
 
-	if err := api.store.Followers.Unfollow(r.Context(), followerUser.ID, payload.UserID); err != nil {
+	if err := api.store.Followers.Unfollow(r.Context(), followerUser.ID, unfollowedId); err != nil {
 		api.internalServerError(w, r, err)
 		return
 	}

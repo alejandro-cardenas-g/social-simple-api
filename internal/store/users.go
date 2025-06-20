@@ -33,6 +33,10 @@ func (p *password) Set(text string) error {
 	return nil
 }
 
+func (p *password) Compare(password string) error {
+	return bcrypt.CompareHashAndPassword(p.hash, []byte(password))
+}
+
 type User struct {
 	ID        int64    `json:"id"`
 	Username  string   `json:"username"`
@@ -40,6 +44,9 @@ type User struct {
 	Password  password `json:"-"`
 	CreatedAt string   `json:"created_at"`
 	IsActive  bool     `json:"is_active"`
+	RoleId    int64    `json:"role_id"`
+
+	Role Role `json:"role"`
 }
 
 type UsersStore struct {
@@ -50,10 +57,20 @@ func (s *UsersStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 	query := `
-		INSERT INTO users (username, password, email) 
-		VALUES ($1, $2, $3) RETURNING id, created_at
+		INSERT INTO users (username, password, email, role_id) 
+		VALUES ($1, $2, $3, 
+			(SELECT r.id FROM roles r
+			WHERE r.name = $4)
+		) 
+		RETURNING id, created_at
 	`
-	err := tx.QueryRowContext(ctx, query, user.Username, user.Password.hash, user.Email).Scan(
+
+	roleName := user.Role.Name
+	if roleName == "" {
+		roleName = "user"
+	}
+
+	err := tx.QueryRowContext(ctx, query, user.Username, user.Password.hash, user.Email, user.Role.Name).Scan(
 		&user.ID,
 		&user.CreatedAt,
 	)
@@ -76,9 +93,11 @@ func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 	query := `
-		SELECT id, username, email, created_at
-		FROM users
-		WHERE id = $1
+		SELECT u.id, u.username, u.email, u.created_at, u.role_id,
+		r.*
+		FROM users u
+		INNER JOIN roles r ON r.id = u.role_id
+		WHERE u.id = $1
 	`
 
 	user := User{}
@@ -88,6 +107,11 @@ func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
 		&user.Username,
 		&user.Email,
 		&user.CreatedAt,
+		&user.RoleId,
+		&user.Role.ID,
+		&user.Role.Name,
+		&user.Role.Level,
+		&user.Role.Description,
 	)
 
 	if err != nil {
@@ -215,4 +239,63 @@ func (s *UsersStore) deleteUserInvitations(ctx context.Context, tx *sql.Tx, user
 	}
 
 	return nil
+}
+
+func (s *UsersStore) delete(ctx context.Context, tx *sql.Tx, userID int64) error {
+	query := `DELETE FROM users WHERE id = $1`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (s *UsersStore) Delete(ctx context.Context, userID int64) error {
+	return withTransaction(s.db, ctx, func(tx *sql.Tx) error {
+		if err := s.delete(ctx, tx, userID); err != nil {
+			return err
+		}
+
+		if err := s.deleteUserInvitations(ctx, tx, userID); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (s *UsersStore) GetByEmail(ctx context.Context, email string) (*User, error) {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	query := `
+		SELECT
+			u.id, u.username, u.email, u.created_at, u.password
+		FROM users u
+		WHERE u.email = $1 and u.is_active
+	`
+
+	user := &User{}
+
+	if err := s.db.QueryRowContext(ctx, query, email).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.CreatedAt,
+		&user.Password.hash,
+	); err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return user, nil
 }
