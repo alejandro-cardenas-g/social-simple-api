@@ -9,6 +9,7 @@ import (
 	"github.com/alejandro-cardenas-g/social/internal/auth"
 	"github.com/alejandro-cardenas-g/social/internal/mailer"
 	"github.com/alejandro-cardenas-g/social/internal/store"
+	"github.com/alejandro-cardenas-g/social/internal/store/cache"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -40,6 +41,14 @@ type config struct {
 	frontendURL string
 	mail        mailConfig
 	auth        authConfig
+	redisCfg    redisConfig
+}
+
+type redisConfig struct {
+	addr    string
+	pw      string
+	db      int
+	enabled bool
 }
 
 type authConfig struct {
@@ -64,6 +73,7 @@ type application struct {
 	logger        *zap.SugaredLogger
 	mailer        mailer.Client
 	authenticator auth.Authenticator
+	cacheStorage  cache.Storage
 }
 
 func (app *application) mount() http.Handler {

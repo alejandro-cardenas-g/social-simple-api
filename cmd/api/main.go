@@ -9,6 +9,8 @@ import (
 	"github.com/alejandro-cardenas-g/social/internal/env"
 	"github.com/alejandro-cardenas-g/social/internal/mailer"
 	"github.com/alejandro-cardenas-g/social/internal/store"
+	"github.com/alejandro-cardenas-g/social/internal/store/cache"
+	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
 )
 
@@ -60,6 +62,12 @@ func main() {
 				iss:    "socalPostsApp",
 			},
 		},
+		redisCfg: redisConfig{
+			addr:    env.GetString("REDIS_ADDR", "localhost:6379"),
+			pw:      env.GetString("REDIS_PW", ""),
+			db:      env.GetInt("REDIS_DB", 0),
+			enabled: env.GetBool("REDIS_ENABLED", false),
+		},
 	}
 
 	db, err := db.New(cfg.db.addr, cfg.db.maxOpenConns, cfg.db.maxIdleConns, cfg.db.maxIdleTime)
@@ -74,6 +82,14 @@ func main() {
 	defer db.Close()
 	logger.Info("DB Connection pool established")
 
+	var rdb *redis.Client
+	if cfg.redisCfg.enabled {
+		rdb = cache.NewRedisClient(cfg.redisCfg.addr, cfg.redisCfg.pw, cfg.redisCfg.db)
+		logger.Info("redis cache connection established")
+	}
+
+	cacheStorage := cache.NewRedisStorage(rdb)
+
 	store := store.NewStorage(db)
 
 	mailer := mailer.NewSendGrid(cfg.mail.sendGrid.apikey, cfg.mail.fromEmail)
@@ -86,6 +102,7 @@ func main() {
 		logger:        logger,
 		mailer:        mailer,
 		authenticator: jwtAuthenticator,
+		cacheStorage:  cacheStorage,
 	}
 
 	mux := app.mount()
