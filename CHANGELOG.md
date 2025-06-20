@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/alejandro-cardenas-g/social-simple-api/compare/v1.0.0...v1.1.0) (2025-06-20)
+
+
+### Features
+
+* auto generate version automation ([20ee8ff](https://github.com/alejandro-cardenas-g/social-simple-api/commit/20ee8ffe5e6ecdf79a1dc90ff0cd2fc889685a06))
+
 ## 1.0.0 (2025-06-20)
 
 
