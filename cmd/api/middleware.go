@@ -74,7 +74,7 @@ func (app *application) AuthTokenMiddleware() func(http.Handler) http.Handler {
 
 			jwtToken, err := app.authenticator.ValidateToken(token)
 			if err != nil {
-				app.unauthorizedBasicError(w, r, err)
+				app.unauthorizedError(w, r, err)
 				return
 			}
 
@@ -83,7 +83,7 @@ func (app *application) AuthTokenMiddleware() func(http.Handler) http.Handler {
 			userID, err := strconv.ParseInt(fmt.Sprintf("%.f", claims["sub"]), 10, 64)
 
 			if err != nil {
-				app.unauthorizedBasicError(w, r, err)
+				app.unauthorizedError(w, r, err)
 				return
 			}
 
@@ -92,7 +92,7 @@ func (app *application) AuthTokenMiddleware() func(http.Handler) http.Handler {
 			user, err := app.getUser(ctx, userID)
 
 			if err != nil {
-				app.unauthorizedBasicError(w, r, err)
+				app.unauthorizedError(w, r, err)
 				return
 			}
 
