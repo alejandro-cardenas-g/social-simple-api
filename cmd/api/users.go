@@ -15,7 +15,7 @@ const userCtx usersKey = "user"
 
 // GetUser godoc
 //
-//	@summary		Fetches an user profile
+//	@summary		Fetches an user profile.
 //	@Description	Fetches an user profile by ID
 //	@Tags			users
 //	@Accept			json
