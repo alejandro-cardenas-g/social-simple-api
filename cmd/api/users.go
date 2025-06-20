@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -134,32 +133,6 @@ func (api *application) unfollowUserHandler(w http.ResponseWriter, r *http.Reque
 	if err := api.jsonResponse(w, http.StatusNoContent, nil); err != nil {
 		api.internalServerError(w, r, err)
 	}
-}
-
-func (api *application) usersContextMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, err := strconv.ParseInt(chi.URLParam(r, "userID"), 10, 64)
-		if err != nil {
-			api.badRequestError(w, r, err)
-			return
-		}
-
-		ctx := r.Context()
-
-		user, err := api.store.Users.GetByID(ctx, userID)
-		if err != nil {
-			switch {
-			case errors.Is(err, store.ErrNotFound):
-				api.notFoundError(w, r, err)
-			default:
-				api.internalServerError(w, r, err)
-			}
-			return
-		}
-
-		ctx = context.WithValue(ctx, userCtx, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 // ActivateUser godoc
