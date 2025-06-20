@@ -1,7 +1,9 @@
 package main
 
 import (
+	"expvar"
 	"log"
+	"runtime"
 	"time"
 
 	"github.com/alejandro-cardenas-g/social/internal/auth"
@@ -113,6 +115,14 @@ func main() {
 		cacheStorage:  cacheStorage,
 		rateLimiter:   rateLimiter,
 	}
+
+	expvar.NewString("version").Set(version)
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+	expvar.Publish("routines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
 
 	mux := app.mount()
 
