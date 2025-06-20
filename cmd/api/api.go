@@ -12,7 +12,9 @@ import (
 
 	"github.com/alejandro-cardenas-g/social/docs" // this is required to generate swagger docs
 	"github.com/alejandro-cardenas-g/social/internal/auth"
+	"github.com/alejandro-cardenas-g/social/internal/env"
 	"github.com/alejandro-cardenas-g/social/internal/mailer"
+	ratelimiter "github.com/alejandro-cardenas-g/social/internal/rateLimiter"
 	"github.com/alejandro-cardenas-g/social/internal/store"
 	"github.com/alejandro-cardenas-g/social/internal/store/cache"
 	"github.com/go-chi/chi/v5"
@@ -47,6 +49,7 @@ type config struct {
 	mail        mailConfig
 	auth        authConfig
 	redisCfg    redisConfig
+	rateLimiter ratelimiter.Config
 }
 
 type redisConfig struct {
@@ -79,14 +82,15 @@ type application struct {
 	mailer        mailer.Client
 	authenticator auth.Authenticator
 	cacheStorage  cache.Storage
+	rateLimiter   ratelimiter.Limiter
 }
 
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedOrigins:   []string{env.GetString("ALLOWED_HOSTS", "http://localhost:5173")},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
@@ -97,6 +101,10 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	if app.config.rateLimiter.Enabled {
+		r.Use(app.RateLimiterMiddleware)
+	}
 
 	r.Use(middleware.Timeout(60 * time.Second))
 

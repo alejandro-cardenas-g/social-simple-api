@@ -30,3 +30,7 @@ seed:
 .PHONY: gen-docs
 gen-docs:
 	@swag init -g ./api/main.go -d cmd,internal && swag fmt
+
+.PHONY: ratelimit
+ratelimit:
+	@npx autocannon -r 20 -c 1 -d 1 --renderStatusCodes http://localhost:3000/v1/health

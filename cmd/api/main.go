@@ -8,6 +8,7 @@ import (
 	"github.com/alejandro-cardenas-g/social/internal/db"
 	"github.com/alejandro-cardenas-g/social/internal/env"
 	"github.com/alejandro-cardenas-g/social/internal/mailer"
+	ratelimiter "github.com/alejandro-cardenas-g/social/internal/rateLimiter"
 	"github.com/alejandro-cardenas-g/social/internal/store"
 	"github.com/alejandro-cardenas-g/social/internal/store/cache"
 	"github.com/go-redis/redis/v8"
@@ -68,6 +69,11 @@ func main() {
 			db:      env.GetInt("REDIS_DB", 0),
 			enabled: env.GetBool("REDIS_ENABLED", false),
 		},
+		rateLimiter: ratelimiter.Config{
+			RequestsPerTimeFrame: env.GetInt("RATE_LIMITER_REQUESTS_COUNT", 20),
+			TimeFrame:            time.Second * 5,
+			Enabled:              env.GetBool("RATE_LIMITER_ENABLED", true),
+		},
 	}
 
 	db, err := db.New(cfg.db.addr, cfg.db.maxOpenConns, cfg.db.maxIdleConns, cfg.db.maxIdleTime)
@@ -96,6 +102,8 @@ func main() {
 
 	jwtAuthenticator := auth.NewJWtAuthenticator(cfg.auth.token.secret, cfg.auth.token.iss, cfg.auth.token.iss)
 
+	rateLimiter := ratelimiter.NewFixedWindowRateLimiter(cfg.rateLimiter.RequestsPerTimeFrame, cfg.rateLimiter.TimeFrame)
+
 	app := &application{
 		config:        cfg,
 		store:         store,
@@ -103,6 +111,7 @@ func main() {
 		mailer:        mailer,
 		authenticator: jwtAuthenticator,
 		cacheStorage:  cacheStorage,
+		rateLimiter:   rateLimiter,
 	}
 
 	mux := app.mount()
